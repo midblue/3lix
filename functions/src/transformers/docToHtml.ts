@@ -114,6 +114,66 @@ const adapters: {
         },
       )
 
+    // * data case, we return JSON.parse-able data
+    if (className.includes(` data`)) {
+      text += `<code data-id="${className.replace(
+        ` data`,
+        ``,
+      )}">`
+
+      const keys: string[] = []
+      for (let tableRowIndex in contentElement.tableRows ||
+        []) {
+        // * first row is the header
+        if (tableRowIndex === `0`) continue
+
+        // * gather keys from second row
+        if (tableRowIndex === `1`) {
+          const tableRow = (contentElement.tableRows || [])[
+            tableRowIndex
+          ]
+          for (let tableCell of tableRow.tableCells || []) {
+            keys.push(
+              applyAdapters((tableCell.content || [])[0], {
+                wrapParagraphs: false,
+              })
+                .replace(/<[^>]*>/g, ``)
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, `-`),
+            )
+          }
+          continue
+        }
+
+        // * gather data from other rows
+        const tableRow = (contentElement.tableRows || [])[
+          tableRowIndex
+        ]
+        text += `{`
+        for (let tableCellIndex in tableRow.tableCells ||
+          []) {
+          const tableCell = (tableRow.tableCells || [])[
+            tableCellIndex
+          ]
+          text += `"${keys[tableCellIndex]}": "`
+          for (let cellContent of tableCell.content || []) {
+            text += applyAdapters(cellContent, {
+              wrapParagraphs: false,
+            }).replace(/"/g, `\\"`)
+          }
+          text += `", `
+        }
+        // take off last comma and space
+        text = text.slice(0, -2)
+        text += `}`
+      }
+
+      text += `</code>`
+      return `${text}`
+    }
+
+    // * normal case, we parse out html elements
+
     text += `<div class="table ${className}">`
     for (let tableRowIndex in contentElement.tableRows ||
       []) {

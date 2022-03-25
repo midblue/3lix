@@ -59,12 +59,15 @@ export async function getDoc(
   return data.data
 }
 
-export async function getHtml(id) {
+export async function getHtml(
+  id,
+  ignoreCache = false,
+): Promise<ResponseOrError<string>> {
   const cached = cachedHtml.find((doc) => doc.id === id)
   if (cached) {
     if (
-      Date.now() - cacheExpirationTime <
-      cached.cacheTime
+      !ignoreCache &&
+      Date.now() - cacheExpirationTime < cached.cacheTime
     ) {
       c.log(`Using cached html`, id)
       return cached.data
