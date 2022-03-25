@@ -76,7 +76,7 @@ export async function getHtml(
   }
 
   const doc = await getDoc(id)
-  if (`error` in doc) return doc.error
+  if (`error` in doc) return { error: doc.error }
   const html = await docToHtml(doc)
 
   if (typeof html === `string`)

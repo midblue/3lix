@@ -90,6 +90,7 @@ const adapters: {
       text += extractText(paragraphElement)
     }
     if (!text) return
+    if ([`—`, `---`].includes(text)) return `<hr />` // replace lone em-dash with hr
     if (!options.wrapParagraphs || text.startsWith(`<`))
       return text
     return `<p>${text}</p>`
@@ -121,6 +122,7 @@ const adapters: {
         ``,
       )}">`
 
+      const data: any[] = []
       const keys: string[] = []
       for (let tableRowIndex in contentElement.tableRows ||
         []) {
@@ -149,25 +151,23 @@ const adapters: {
         const tableRow = (contentElement.tableRows || [])[
           tableRowIndex
         ]
-        text += `{`
+        const rowData = {}
         for (let tableCellIndex in tableRow.tableCells ||
           []) {
+          let cellData = ``
           const tableCell = (tableRow.tableCells || [])[
             tableCellIndex
           ]
-          text += `"${keys[tableCellIndex]}": "`
           for (let cellContent of tableCell.content || []) {
-            text += applyAdapters(cellContent, {
+            cellData += applyAdapters(cellContent, {
               wrapParagraphs: false,
-            }).replace(/"/g, `\\"`)
+            }).replace(/"/g, `'`)
           }
-          text += `", `
+          rowData[keys[tableCellIndex]] = cellData
         }
-        // take off last comma and space
-        text = text.slice(0, -2)
-        text += `}`
+        data.push(rowData)
       }
-
+      text += JSON.stringify(data)
       text += `</code>`
       return `${text}`
     }
