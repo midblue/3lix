@@ -15,6 +15,7 @@ import { getDoc } from './docs'
 const sizes = [
   { suffix: `-large`, size: 1200 },
   { suffix: `-small`, size: 500 },
+  { suffix: `-tiny`, size: 100 },
 ]
 
 /** returns onject ids of files that ARE uploaded and are used in the document */
@@ -72,12 +73,13 @@ export async function clearUnusedFilesInDocument(
   for (let file of existingFilesForDocument) {
     const id = file.split(`-`)[0]
     const size = file.split(`-`)[1].split(`.`)[0]
+    const extension = file.split(`-`)[1].split(`.`)[1]
     knownToExist[id] = knownToExist[id] || []
     knownToExist[id].push({
       size:
         sizes.find((s) => s.suffix === `-${size}`)?.size ||
         0,
-      path: `https://storage.googleapis.com/${bucketName}/${documentId}/${id}-${size}.jpg`,
+      path: `https://storage.googleapis.com/${bucketName}/${documentId}/${id}-${size}.${extension}`,
     })
   }
 
@@ -89,10 +91,17 @@ export async function resizeAndUpload(
   objectId: string,
   imageUrl: string,
 ): Promise<{ size: number; path: string }[]> {
+  const rawFile = await axios.get(imageUrl, {
+    responseType: `arraybuffer`,
+  })
+  const contentType = rawFile.headers[`content-type`]
+  const extension =
+    contentType === `image/gif` ? `gif` : `jpg`
+
   const exists = await fileExists(
     `${documentId}/${objectId}${
       sizes[sizes.length - 1].suffix
-    }.jpg`,
+    }.${extension}`,
   )
   if (exists) {
     c.log(
@@ -102,7 +111,7 @@ export async function resizeAndUpload(
       size: size.size,
       path: `https://storage.googleapis.com/${bucketName}/${documentId}/${encodeURI(
         objectId,
-      )}${size.suffix}.jpg`,
+      )}${size.suffix}.${extension}`,
     }))
   }
 
@@ -111,32 +120,42 @@ export async function resizeAndUpload(
     path: string
   }[] = []
 
-  const rawFile = await axios.get(imageUrl, {
-    responseType: `arraybuffer`,
-  })
-
   for (let size of sizes) {
-    const buffer = await sharp(rawFile.data)
-      .resize(size.size, size.size, {
+    let buffer: Buffer | undefined
+    let sharpManip: Promise<sharp.Sharp> | sharp.Sharp =
+      sharp(rawFile.data, {
+        animated: extension === `gif`,
+      }).resize(size.size, size.size, {
         fit: `inside`,
         withoutEnlargement: true,
       })
-      .jpeg({
+    if (extension === `gif`) {
+      sharpManip = await (
+        await sharpManip
+      ).gif({
+        loop: 0,
+      })
+    } else {
+      sharpManip = await sharpManip.jpeg({
         progressive: true,
         quality: 80,
         force: false,
       })
-      .toBuffer()
-      .catch((err) => {
-        c.log(err)
-        return undefined
-      })
+    }
+    buffer = await sharpManip.toBuffer().catch((err) => {
+      c.log(err)
+      return undefined
+    })
 
     if (!buffer) continue
 
-    const fileName = `${documentId}/${objectId}${size.suffix}.jpg`
+    const fileName = `${documentId}/${objectId}${size.suffix}.${extension}`
 
-    const publicPath = await uploadFile(fileName, buffer)
+    const publicPath = await uploadFile(
+      fileName,
+      buffer,
+      contentType === `image/gif` ? contentType : undefined,
+    )
     if (typeof publicPath !== `string`) {
       c.error(publicPath.error)
       continue
@@ -167,6 +186,7 @@ async function fileExists(path: string): Promise<boolean> {
 async function uploadFile(
   path: string,
   data: Buffer,
+  contentType?: string,
 ): Promise<ResponseOrError<string>> {
   return new Promise(async (resolve) => {
     try {
@@ -177,7 +197,7 @@ async function uploadFile(
       const blobStream = file.createWriteStream({
         resumable: false,
         metadata: {
-          contentType: `image/jpeg`,
+          contentType: contentType || `image/jpeg`,
         },
       })
       blobStream.on(`error`, (err) =>

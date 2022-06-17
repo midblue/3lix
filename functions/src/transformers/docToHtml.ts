@@ -4,7 +4,7 @@ import MarkdownIt from 'markdown-it'
 const md = new MarkdownIt({
   html: true,
   breaks: true, // Convert '\n' in paragraphs into <br>
-  linkify: true, // Autoconvert URL-like text to links
+  // linkify: true, // Autoconvert URL-like text to links
   typographer: true,
   quotes: `“”‘’`,
 })
@@ -39,7 +39,9 @@ export default async function docToHtml(
   let html: string = ``
 
   content.forEach((contentElement) => {
-    html += applyAdapters(contentElement)
+    const adapted = applyAdapters(contentElement)
+    if (/^[\s\n]*$/.test(adapted)) return
+    html += adapted
   })
 
   html = await applyInlineObjects(
@@ -89,10 +91,14 @@ const adapters: {
       []) {
       text += extractText(paragraphElement)
     }
-    if (!text) return
     if ([`—`, `---`].includes(text)) return `<hr />` // replace lone em-dash with hr
-    if (!options.wrapParagraphs || text.startsWith(`<`))
-      return text
+    if (!text) return
+    text = md
+      .render(text)
+      .trim()
+      .replace(/^<p>/, ``)
+      .replace(/<\/p>$/, ``)
+    if (!options.wrapParagraphs) return text
     return `<p>${text}</p>`
   },
   table: (contentElement: docsv1.Schema$Table, options) => {
@@ -139,8 +145,10 @@ const adapters: {
               applyAdapters((tableCell.content || [])[0], {
                 wrapParagraphs: false,
               })
+                .replace(/\([^)]*\)/g, ``) // skip anything in parentheses
                 .replace(/<[^>]*>/g, ``)
                 .toLowerCase()
+                .trim()
                 .replace(/[^a-z0-9]/g, `-`),
             )
           }
@@ -173,7 +181,6 @@ const adapters: {
     }
 
     // * normal case, we parse out html elements
-
     text += `<div class="table ${className}">`
     for (let tableRowIndex in contentElement.tableRows ||
       []) {
@@ -184,12 +191,24 @@ const adapters: {
       text += `<div class="row">`
       for (let tableCell of tableRow.tableCells || []) {
         text += `<div class="cell">`
+        let cellText = ``
         for (let cellContent of tableCell.content || []) {
-          text += applyAdapters(cellContent, {
-            wrapParagraphs: false,
+          cellText += applyAdapters(cellContent, {
+            wrapParagraphs: true,
           })
         }
+        cellText = md.render(cellText)
+        text += cellText
         text += `</div>`
+
+        // * early exit if there's only one thing in here — just send it, not all the wrappers
+        if (
+          (contentElement.tableRows || []).length < 3 &&
+          (tableRow.tableCells || []).length < 2
+        ) {
+          text = `<div class="table ${className}">${cellText}</div>`
+          return text
+        }
       }
       text += `</div>`
     }
@@ -257,7 +276,7 @@ async function applyInlineObjects(
     }
 
     if (outputImages) {
-      c.log(outputImages)
+      // c.log(outputImages)
       objectHtml = `<picture>`
       for (let outputImage of outputImages.slice(1))
         objectHtml += `<source srcset="${
@@ -274,8 +293,14 @@ async function applyInlineObjects(
 }
 
 function finalize(rawHtml: string): string {
-  return rawHtml
-    .replace(/\n<\//g, `</`)
-    .replace(/\n/g, `<br />`)
-    .replace(/(?!:br ?\/?)>\s*<br ?\/?>/g, `>`)
+  return (
+    rawHtml
+      .replace(/\n<\//g, `</`)
+      .replace(/\n/g, `<br />`)
+      .replace(/(?!:br ?\/?)>\s*<br ?\/?>/g, `>`)
+      // clear unnecessary <p> tags
+      .replace(/<p><h(\d)>/g, `<h$1>`)
+      .replace(/<\/h(\d)><\/p>/g, `</h$1>`)
+      .replace(/<p>(<picture>.*?<\/picture>)<\/p>/g, `$1`)
+  )
 }

@@ -48,7 +48,11 @@ export async function getDoc(
     })
     c.log(`Fetching doc ${id} from google docs`)
   } catch (e) {
-    c.error(e)
+    c.error(
+      `error getting`,
+      id,
+      (e as any).data?.error || (e as any).errors || e,
+    )
   }
 
   if (!data?.data)
