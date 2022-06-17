@@ -91,6 +91,7 @@ export async function resizeAndUpload(
   objectId: string,
   imageUrl: string,
 ): Promise<{ size: number; path: string }[]> {
+  c.log(`Resizing and uploading ${imageUrl}`)
   const rawFile = await axios.get(imageUrl, {
     responseType: `arraybuffer`,
   })
