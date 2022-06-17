@@ -208,7 +208,7 @@ async function uploadFile(
           file.name,
         )}`
         c.log(
-          `Resized image ${path} uploaded to ${bucketName}`,
+          `Resized image ${publicUrl} uploaded to ${bucketName}`,
         )
         resolve(publicUrl)
       })
