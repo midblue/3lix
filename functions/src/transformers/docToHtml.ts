@@ -52,7 +52,7 @@ export default async function docToHtml(
   )
 
   html = finalize(html)
-  c.log(html)
+  // c.log(html)
 
   return html
 }
