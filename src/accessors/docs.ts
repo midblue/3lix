@@ -13,7 +13,9 @@ let cachedHtml: {
   revisionId: string | null
   data: string
 }[] = []
-const cacheExpirationTime = 1000 * 60 * 60 // 1 hour
+const cacheExpirationTime = parseInt(
+  process.env.CACHE_EXPIRE_TIME ?? `${-1}`,
+)
 
 async function initDocs() {
   if (!client) client = await getClient()
@@ -66,16 +68,16 @@ export async function getDoc(
 
 export async function getHtml(id) {
   // * this is to use cached by time
-  // const cached = cachedHtml.find((doc) => doc.id === id)
-  // if (cached) {
-  //   if (
-  //     Date.now() - cacheExpirationTime <
-  //     cached.cacheTime
-  //   ) {
-  //     c.log('Using cached html', id)
-  //     return cached.data
-  //   } else cachedHtml.splice(cachedHtml.indexOf(cached), 1)
-  // }
+  const cached = cachedHtml.find((doc) => doc.id === id)
+  if (cached) {
+    if (
+      Date.now() - cacheExpirationTime <
+      cached.cacheTime
+    ) {
+      c.log('Using cached html (too soon to rescrape)', id)
+      return cached.data
+    } else cachedHtml.splice(cachedHtml.indexOf(cached), 1)
+  }
 
   const doc = await getDoc(id)
   if ('error' in doc) return doc.error
@@ -85,7 +87,7 @@ export async function getHtml(id) {
     (d) => d.revisionId === doc.revisionId,
   )
   if (doc.revisionId && matchesCachedRevisionId) {
-    c.log('Using cached html', id)
+    c.log('Using cached html (same revision)', id)
     return matchesCachedRevisionId.data
   }
 
