@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "build": "tsc -w -p .",
-    "build-once": "tsc -p .",
+    "build": "npx --node-options=\"--max-old-space-size=8192\" tsc -web",
+    "build-once": "npx --node-options=\"--max-old-space-size=8192\" tsc",
     "start": "node dist/index.js",
     "dev": "nodemon dist/index.js"
   },
