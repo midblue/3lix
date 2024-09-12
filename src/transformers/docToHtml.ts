@@ -190,7 +190,9 @@ const adapters: {
       ]
       text += `<div class="row">`
       for (let tableCell of tableRow.tableCells || []) {
-        text += `<div class="cell">`
+        text += `<div class="cell rows${
+          (contentElement.tableRows || []).length
+        } cells${(tableRow.tableCells || []).length}">`
         let cellText = ``
         for (let cellContent of tableCell.content || []) {
           cellText += applyAdapters(cellContent, {
@@ -227,6 +229,10 @@ function extractText(element) {
       .trim()
       .replace(/^<p>/g, ``)
       .replace(/<\/p>$/g, ``)
+      // fix quotes inside of html tags being fancy quotes
+      .replace(/<[^>]*>/g, (match) =>
+        match.replace(/“/g, `"`).replace(/”/g, `"`),
+      )
   }
 
   // c.log(JSON.stringify(element, null, 2))
@@ -293,14 +299,11 @@ async function applyInlineObjects(
 }
 
 function finalize(rawHtml: string): string {
-  return (
-    rawHtml
-      .replace(/\n<\//g, `</`)
-      .replace(/\n/g, `<br />`)
-      .replace(/(?!:br ?\/?)>\s*<br ?\/?>/g, `>`)
-      // clear unnecessary <p> tags
-      .replace(/<p><h(\d)>/g, `<h$1>`)
-      .replace(/<\/h(\d)><\/p>/g, `</h$1>`)
-      .replace(/<p>(<picture>.*?<\/picture>)<\/p>/g, `$1`)
-  )
+  return rawHtml
+    .replace(/\n<\//g, `</`)
+    .replace(/\n/g, `<br />`)
+    .replace(/(?!:br ?\/?)>\s*<br ?\/?>/g, `>`)
+    .replace(/<p><h(\d)>/g, `<h$1>`)
+    .replace(/<\/h(\d)><\/p>/g, `</h$1>`)
+    .replace(/<p>(<picture>.*?<\/picture>)<\/p>/g, `$1`)
 }

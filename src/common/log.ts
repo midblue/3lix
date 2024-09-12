@@ -72,7 +72,7 @@ export const log = (...args: any[]): void => {
 }
 
 export function error(...args: any[]): void {
-  log(`red`, ...arguments)
+  log('red', ...arguments)
 }
 
 export function trace() {

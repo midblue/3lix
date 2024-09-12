@@ -1,14 +1,13 @@
 import * as c from '../common/index'
 
-// eslint-disable-next-line
-import type { docs_v1 as docsv1 } from 'googleapis'
+import type { docs_v1 } from 'googleapis'
 
 import axios from 'axios'
 import { Storage } from '@google-cloud/storage'
 const storage = new Storage()
-const bucketName = `3lix-images`
+const bucketName = '3lix-images'
 
-import sharp from 'sharp'
+import sharp, { Sharp } from 'sharp'
 import { reloadAllFiles } from './drive'
 import { getDoc } from './docs'
 
@@ -18,11 +17,11 @@ const sizes = [
   { suffix: `-tiny`, size: 100 },
 ]
 
-/** returns onject ids of files that ARE uploaded and are used in the document */
+/** returns object ids of files that ARE uploaded and are used in the document */
 export async function clearUnusedFilesInDocument(
   documentId: string,
   inlineObjects: {
-    [key: string]: docsv1.Schema$InlineObject
+    [key: string]: docs_v1.Schema$InlineObject
   },
 ): Promise<{
   [key: string]: { size: number; path: string }[]
@@ -38,14 +37,15 @@ export async function clearUnusedFilesInDocument(
       const files = (data[0] || []).filter((d) => d)
       c.log(
         `Found ${files.length} existing files for document ${documentId}`,
+        // files.map((file) => file.name.split('/')[1]),
       )
       return files
-        .map((file) => file.name.split(`/`)[1])
+        .map((file) => file.name.split('/')[1])
         .filter((name) => name)
     })
 
   const excessFiles = existingFilesForDocument.filter(
-    (file) => !objectIds.includes(file.split(`-`)[0]),
+    (file) => !objectIds.includes(file.split('-')[0]),
   )
 
   const knownToExist: {
@@ -64,16 +64,17 @@ export async function clearUnusedFilesInDocument(
         c.log(`Deleted unused file ${file}.`)
       })
       .catch((err) => {
-        c.error(
+        c.log(
+          'red',
           `Error deleting unused file ${file}: ${err}`,
         )
       })
   }
 
   for (let file of existingFilesForDocument) {
-    const id = file.split(`-`)[0]
-    const size = file.split(`-`)[1].split(`.`)[0]
-    const extension = file.split(`-`)[1].split(`.`)[1]
+    const id = file.split('-')[0]
+    const size = file.split('-')[1].split('.')[0]
+    const extension = file.split('-')[1].split('.')[1]
     knownToExist[id] = knownToExist[id] || []
     knownToExist[id].push({
       size:
@@ -91,13 +92,12 @@ export async function resizeAndUpload(
   objectId: string,
   imageUrl: string,
 ): Promise<{ size: number; path: string }[]> {
-  c.log(`Resizing and uploading ${imageUrl}`)
   const rawFile = await axios.get(imageUrl, {
     responseType: `arraybuffer`,
   })
   const contentType = rawFile.headers[`content-type`]
   const extension =
-    contentType === `image/gif` ? `gif` : `jpg`
+    contentType === 'image/gif' ? 'gif' : 'jpg'
 
   const exists = await fileExists(
     `${documentId}/${objectId}${
@@ -106,7 +106,9 @@ export async function resizeAndUpload(
   )
   if (exists) {
     c.log(
-      `${objectId} already exists, returning existing paths`,
+      `${objectId} already exists, returning existing paths: https://storage.googleapis.com/${bucketName}/${documentId}/${encodeURI(
+        objectId,
+      )}${sizes[0].suffix}.${extension}`,
     )
     return sizes.map((size) => ({
       size: size.size,
@@ -123,14 +125,14 @@ export async function resizeAndUpload(
 
   for (let size of sizes) {
     let buffer: Buffer | undefined
-    let sharpManip: Promise<sharp.Sharp> | sharp.Sharp =
-      sharp(rawFile.data, {
-        animated: extension === `gif`,
-      }).resize(size.size, size.size, {
-        fit: `inside`,
-        withoutEnlargement: true,
-      })
-    if (extension === `gif`) {
+    let sharpManip: Promise<Sharp> | Sharp = sharp(
+      rawFile.data,
+      { animated: extension === 'gif' },
+    ).resize(size.size, size.size, {
+      fit: `inside`,
+      withoutEnlargement: true,
+    })
+    if (extension === 'gif') {
       sharpManip = await (
         await sharpManip
       ).gif({
@@ -155,10 +157,10 @@ export async function resizeAndUpload(
     const publicPath = await uploadFile(
       fileName,
       buffer,
-      contentType === `image/gif` ? contentType : undefined,
+      contentType === 'image/gif' ? contentType : undefined,
     )
-    if (typeof publicPath !== `string`) {
-      c.error(publicPath.error)
+    if (typeof publicPath !== 'string') {
+      c.log('red', publicPath.error)
       continue
     }
     outputData.push({
@@ -198,7 +200,7 @@ async function uploadFile(
       const blobStream = file.createWriteStream({
         resumable: false,
         metadata: {
-          contentType: contentType || `image/jpeg`,
+          contentType: contentType || 'image/jpeg',
         },
       })
       blobStream.on(`error`, (err) =>
@@ -247,7 +249,10 @@ export async function deleteAllImagesForDocumentId(
         c.log(`Deleted file ${file.name}.`)
       })
       .catch((err) => {
-        c.error(`Error deleting file ${file.name}: ${err}`)
+        c.log(
+          'red',
+          `Error deleting file ${file.name}: ${err}`,
+        )
       })
   }
 }
@@ -264,7 +269,7 @@ export async function checkForUnusedImagesInAllFiles() {
       .then((data) => {
         const files = (data[0] || []).filter((d) => d)
         return files
-          .map((file) => file.name.split(`/`)[0])
+          .map((file) => file.name.split('/')[0])
           .filter((id) => id)
       }),
   )
@@ -272,7 +277,7 @@ export async function checkForUnusedImagesInAllFiles() {
   for (let idAssociatedWithImage of allDocIdsAssociatedWithImages) {
     if (!allDocIds.includes(idAssociatedWithImage)) {
       c.log(
-        `Found image(s) associated with document that no longer exists`,
+        'Found image(s) associated with document that no longer exists',
       )
       deleteAllImagesForDocumentId(idAssociatedWithImage)
     }
@@ -280,8 +285,9 @@ export async function checkForUnusedImagesInAllFiles() {
 
   for (let id of allDocIds) {
     const docData = await getDoc(id)
-    if (`error` in docData) {
-      c.error(
+    if ('error' in docData) {
+      c.log(
+        'red',
         `Error getting doc ${id}: ${docData.error}, removing all files associated with it`,
       )
       deleteAllImagesForDocumentId(id)
@@ -308,7 +314,7 @@ export async function checkForUnusedImagesInAllFiles() {
     for (let file of existingFiles) {
       if (
         !inlineObjectIds.includes(
-          file.name.split(`/`)[1].split(`-`)[0],
+          file.name.split('/')[1].split('-')[0],
         )
       ) {
         await storage
@@ -319,11 +325,14 @@ export async function checkForUnusedImagesInAllFiles() {
             c.log(`Deleted unused file ${file.name}.`)
           })
           .catch((err) => {
-            c.error(
+            c.log(
+              'red',
               `Error deleting file ${file.name}: ${err}`,
             )
           })
       }
     }
   }
+
+  c.log('done with cleanup')
 }
