@@ -1,10 +1,10 @@
 {
   "scripts": {
-    "build": "npx --node-options=\"--max-old-space-size=8192\" tsc -web",
-    "build-once": "npx --node-options=\"--max-old-space-size=8192\" tsc",
+    "build": "npx --node-options=\"--max-old-space-size=1500\" tsc -w",
+    "build-once": "npx --node-options=\"--max-old-space-size=1500\" tsc",
     "start": "node dist/index.js",
     "dev": "nodemon dist/index.js",
-    "golive": "git push && ssh root@p.jasperstephenson.com 'source ~/.profile && cd ~/3lix && git pull && nvm use 20 && npm install && npm run build-once && /usr/local/bin/pm2 restart 3lix && /usr/local/bin/pm2 logs'"
+    "golive": "git push && ssh root@p.jasperstephenson.com 'source ~/.profile && cd ~/3lix && git pull && nvm use 20 && pnpm install && pnpm run build-once && /usr/local/bin/pm2 restart 3lix && /usr/local/bin/pm2 logs'"
   },
   "dependencies": {
     "@google-cloud/storage": "^5.17.0",
